@@ -40,6 +40,18 @@ Per aggiungere un tool, creare `tools/nome-tool/index.html` e aggiungere una voc
 - Salvataggio automatico in `localStorage`, solo nel browser/dispositivo e origine correnti. Non è una sincronizzazione o un backup; cancellare i dati del browser elimina la matrice. Se lo storage non è disponibile, il tool continua a funzionare con un avviso.
 - Ripristino dell'esempio con conferma.
 
+## Griglia obiettivi 9×9
+
+In `tools/goal-grid/`: un obiettivo centrale, otto aree e otto azioni per area (64 azioni). La struttura riprende la griglia Mandala / Open Window 64 mostrata nel video di riferimento: https://www.tiktok.com/@improvewithkate/video/7685805253601660192.
+
+- Cliccare sulle celle per modificarle. I nomi delle aree vengono aggiornati in entrambe le posizioni della griglia.
+- La lista sotto la griglia permette di scegliere un’area e spuntare le azioni completate. Un’azione vuota non può essere completata.
+- Bozza automatica in `localStorage` e snapshot indipendenti in IndexedDB, separati dalla matrice decisionale.
+- Link tramite `case` in Base64url UTF-8, con obiettivo, aree, azioni e stato di completamento. Il link ha precedenza sulla bozza locale; modificarlo non modifica la copia del mittente. I dati nel link sono leggibili da chi lo riceve.
+- Griglia iniziale vuota ed esempio completo per il lancio di un servizio; sostituzione della bozza e cancellazione degli snapshot richiedono conferma.
+- Pulsante **Stampa / PDF** con layout della griglia in formato A4 orizzontale; scegliere “Salva come PDF” nella finestra di stampa del browser.
+- Sul telefono la griglia scorre orizzontalmente, mentre la lista delle azioni resta adattata allo schermo.
+
 ## Struttura
 
 ```text
@@ -51,7 +63,13 @@ assets/js/matrix.js            Interfaccia, storico e condivisione
 assets/js/matrix-storage.js    Database IndexedDB degli snapshot
 assets/favicon.svg            Icona del sito
 tools/decision-matrix/         Matrice decisionale
-tests/matrix.test.cjs          Test del calcolo
+tools/goal-grid/              Griglia obiettivi 9×9
+assets/js/goal-core.js         Modello, posizioni e condivisione della griglia
+assets/js/goal-grid.js         Interfaccia e progressi
+assets/js/goal-storage.js      Snapshot della griglia in IndexedDB
+assets/css/goal-grid.css       Stile e stampa della griglia
+tests/matrix.test.cjs          Test del calcolo e dei link della matrice
+tests/goal-grid.test.cjs       Test della griglia, dei progressi e dei link
 ```
 
 ## Verifica del calcolo
@@ -59,5 +77,5 @@ tests/matrix.test.cjs          Test del calcolo
 I test usano il test runner integrato di Node.js 18+ (solo per lo sviluppo, non necessario al sito):
 
 ```sh
-node --test tests/matrix.test.cjs
+node --test tests/*.test.cjs
 ```
