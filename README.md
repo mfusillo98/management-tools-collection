@@ -47,7 +47,8 @@ index.html                    Home e filtri
 assets/css/style.css          Personalizzazioni di Bootstrap
 assets/js/catalog.js          Catalogo estendibile
 assets/js/matrix-core.js       Validazione e calcolo
-assets/js/matrix.js            Interfaccia e salvataggio
+assets/js/matrix.js            Interfaccia, storico e condivisione
+assets/js/matrix-storage.js    Database IndexedDB degli snapshot
 assets/favicon.svg            Icona del sito
 tools/decision-matrix/         Matrice decisionale
 tests/matrix.test.cjs          Test del calcolo

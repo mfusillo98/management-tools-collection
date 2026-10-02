@@ -18,7 +18,22 @@
     const ranking = state.options.map((option, index) => ({ name: option.name, index, score: option.scores.reduce((sum, score, i) => sum + (state.criteria[i].weight === 0 ? 0 : score * state.criteria[i].weight), 0) / total })).sort((a, b) => b.score - a.score);
     return { total, ranking, winners: ranking.filter(o => Math.abs(o.score - ranking[0].score) < 1e-9) };
   }
-  const api = { example, validState, calculate };
+  // Keep only the documented fields when importing untrusted links.
+  function copyState(state) {
+    if (!validState(state)) throw new Error('Dati della matrice non validi.');
+    return { version: 1, title: state.title, criteria: state.criteria.map(c => ({ name: c.name, weight: c.weight })), options: state.options.map(o => ({ name: o.name, scores: [...o.scores] })) };
+  }
+  function encodeState(state) {
+    const bytes = new TextEncoder().encode(JSON.stringify(copyState(state)));
+    return btoa(Array.from(bytes, byte => String.fromCharCode(byte)).join('')).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function decodeState(value) {
+    if (typeof value !== 'string' || !value.length || value.length > 65536 || !/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('Link non valido.');
+    const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+    const bytes = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
+    return copyState(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)));
+  }
+  const api = { example, validState, calculate, copyState, encodeState, decodeState };
   root.MatrixCore = api;
   if (typeof module !== 'undefined') module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

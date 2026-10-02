@@ -25,3 +25,19 @@ test('blank labels and missing weights are incomplete', () => {
   const state = example(); state.criteria[0].name = ' '; assert.ok(calculate(state).error);
   state.criteria[0].name = 'Costo'; state.criteria[0].weight = null; assert.ok(calculate(state).error);
 });
+test('shared cases preserve Unicode, incomplete scores and zero weights', () => {
+  const { encodeState, decodeState } = require('../assets/js/matrix-core.js');
+  const state = example(); state.title = 'Caffè ☕ e decisioni 日本語'; state.criteria[0].weight = 0; state.options[0].scores[0] = null;
+  const encoded = encodeState(state);
+  assert.match(encoded, /^[A-Za-z0-9_-]+$/);
+  assert.deepEqual(decodeState(encoded), state);
+  assert.deepEqual(calculate(decodeState(encoded)), calculate(state));
+});
+test('shared cases reject corrupt, oversized and invalid payloads and discard extra fields', () => {
+  const { encodeState, decodeState } = require('../assets/js/matrix-core.js');
+  for (const value of ['', '*', 'a'.repeat(65537), btoa('{}'), btoa('{'), btoa(String.fromCharCode(255))]) assert.throws(() => decodeState(value));
+  const invalid = example(); invalid.options[0].scores[0] = 99;
+  assert.throws(() => decodeState(btoa(JSON.stringify(invalid))));
+  const state = example(); state.extra = 'discard'; state.criteria[0].extra = 'discard';
+  assert.deepEqual(decodeState(encodeState(state)), example());
+});

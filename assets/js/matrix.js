@@ -10,10 +10,20 @@ try {
     else storageMessage = 'I dati salvati non sono validi: è stato caricato l’esempio.';
   }
 } catch { storageMessage = 'Salvataggio locale non disponibile o dati illeggibili. Puoi comunque usare la matrice.'; }
+const shared = new URL(location.href).searchParams.get('case');
+let sharedMessage = '';
+if (shared !== null) {
+  try { state = MatrixCore.decodeState(shared); sharedMessage = 'Caso condiviso caricato. Puoi modificarlo o salvarne uno snapshot.'; }
+  catch { sharedMessage = 'Il link condiviso contiene dati non validi. È stata mantenuta la matrice locale.'; }
+}
 const titleInput = document.querySelector('#decision-name');
 const numberFormat = new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const percentFormat = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 });
 function save() {
+  // Once edited, the address must not retain an outdated shared case.
+  const url = new URL(location.href);
+  if (url.searchParams.has('case')) { url.searchParams.delete('case'); history.replaceState(null, '', url); }
+  document.querySelector('#share-panel').hidden = true;
   try { localStorage.setItem(KEY, JSON.stringify(state)); document.querySelector('#save-status').textContent = 'Salvato in questo browser.'; }
   catch { document.querySelector('#save-status').textContent = 'Impossibile salvare: le modifiche resteranno disponibili solo fino alla chiusura della pagina.'; }
 }
@@ -82,3 +92,69 @@ document.querySelector('#add-criterion').addEventListener('click', () => { if (s
 document.querySelector('#reset').addEventListener('click', () => { if (!window.confirm('Ripristinare l’esempio? Le modifiche alla matrice attuale verranno eliminate.')) return; state = MatrixCore.example(); save(); render(); titleInput.focus(); });
 render();
 if (storageMessage) document.querySelector('#save-status').textContent = storageMessage;
+
+const caseStatus = document.querySelector('#case-status');
+caseStatus.textContent = sharedMessage;
+const snapshotButton = document.querySelector('#save-snapshot');
+const snapshotList = document.querySelector('#snapshot-list');
+const historyStatus = document.querySelector('#history-status');
+const dateFormat = new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium', timeStyle: 'medium' });
+let snapshotBusy = false;
+async function refreshHistory() {
+  try {
+    const snapshots = await MatrixStorage.list();
+    snapshotList.replaceChildren();
+    const valid = snapshots.filter(item => Number.isFinite(item.createdAt) && MatrixCore.validState(item.state)).sort((a, b) => b.createdAt - a.createdAt || b.id - a.id);
+    historyStatus.textContent = valid.length ? `${valid.length} snapshot ${valid.length === 1 ? 'salvato' : 'salvati'}.` : 'Nessuno snapshot salvato. Salva il caso attuale per ritrovarlo qui.';
+    valid.forEach(snapshot => {
+      const item = document.createElement('li'); item.className = 'snapshot-item';
+      const info = document.createElement('div'); info.className = 'snapshot-info';
+      const title = document.createElement('strong'); title.textContent = snapshot.state.title.trim() || 'Caso senza titolo';
+      const details = document.createElement('div'); details.className = 'status-text mt-1'; details.textContent = `${dateFormat.format(snapshot.createdAt)} · ${snapshot.state.options.length} alternative · ${snapshot.state.criteria.length} criteri`;
+      info.append(title, details);
+      const actions = document.createElement('div'); actions.className = 'd-flex gap-2';
+      const restore = document.createElement('button'); restore.type = 'button'; restore.className = 'btn btn-sm btn-outline-secondary'; restore.textContent = 'Riapri'; restore.setAttribute('aria-label', `Riapri ${title.textContent}`);
+      restore.addEventListener('click', () => {
+        if (!confirm('Riaprire questo snapshot? La matrice attuale verrà sostituita. Salva prima uno snapshot se vuoi conservarla.')) return;
+        state = MatrixCore.copyState(snapshot.state); save(); render(); caseStatus.textContent = 'Snapshot riaperto. Le modifiche non alterano la copia salvata.'; titleInput.focus();
+      });
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'btn btn-sm btn-outline-secondary'; remove.textContent = 'Elimina'; remove.setAttribute('aria-label', `Elimina ${title.textContent}`);
+      remove.addEventListener('click', async () => {
+        if (!confirm('Eliminare definitivamente questo snapshot dallo storico?')) return;
+        remove.disabled = true;
+        try { await MatrixStorage.remove(snapshot.id); await refreshHistory(); snapshotButton.focus(); }
+        catch { caseStatus.textContent = 'Impossibile eliminare lo snapshot. Riprova.'; remove.disabled = false; }
+      });
+      actions.append(restore, remove); item.append(info, actions); snapshotList.append(item);
+    });
+    snapshotButton.disabled = snapshotBusy;
+  } catch {
+    historyStatus.textContent = 'Database locale non disponibile. Lo storico non può essere letto: prova a riaprire la pagina o verifica le impostazioni del browser.';
+    snapshotButton.disabled = true;
+  }
+}
+snapshotButton.addEventListener('click', async () => {
+  if (snapshotBusy) return;
+  snapshotBusy = true; snapshotButton.disabled = true;
+  try {
+    await MatrixStorage.add(state);
+    caseStatus.textContent = 'Snapshot salvato nello storico.';
+    await refreshHistory();
+  } catch { caseStatus.textContent = 'Impossibile salvare lo snapshot. Verifica lo spazio disponibile e le impostazioni del browser.'; }
+  finally { snapshotBusy = false; snapshotButton.disabled = false; }
+});
+document.querySelector('#share-case').addEventListener('click', () => {
+  try {
+    const url = new URL(location.href); url.searchParams.set('case', MatrixCore.encodeState(state)); url.hash = '';
+    document.querySelector('#share-url').value = url.href;
+    document.querySelector('#share-panel').hidden = false;
+    caseStatus.textContent = 'Link pronto: contiene una copia del caso al momento della generazione.';
+    document.querySelector('#share-url').focus(); document.querySelector('#share-url').select();
+  } catch { caseStatus.textContent = 'Impossibile generare il link: il caso contiene dati non validi.'; }
+});
+document.querySelector('#copy-link').addEventListener('click', async () => {
+  const field = document.querySelector('#share-url');
+  try { await navigator.clipboard.writeText(field.value); caseStatus.textContent = 'Link copiato. Puoi condividerlo.'; }
+  catch { field.focus(); field.select(); caseStatus.textContent = 'Copia automatica non disponibile. Copia il link selezionato con Ctrl+C o ⌘C.'; }
+});
+refreshHistory();
